@@ -84,14 +84,19 @@ class ChunkedUploader:
         total_parts = self._upload_session.total_parts
         results = []
         progress_callback(total_parts, 0, [])
+
         for step in range((len(params_list)//multi)+1):
+
             beg = step * multi
             end = beg + multi
             xparams = params_list[beg:end]
+
             with ThreadPoolExecutor() as _: 
                 futures = [_.submit(put, url, **p) for p in xparams]
                 results.extend([future.result().json() for future in futures])
-            progress_callback(total_parts, len(results), results[-multi:])
+
+            progress_callback(total_parts, len(results), results[beg:end])
+
         return results
 
     def _upload_part(self, m, progress_callback, multi=4):
@@ -115,6 +120,7 @@ class ChunkedUploader:
             beg = end
             end = beg + part_size
             end = size if end > size else end
+
         results = self._multi_upload_part(params_list, multi, progress_callback)
         return results
 
