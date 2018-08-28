@@ -9,8 +9,9 @@ from chunked_uploader import ChunkedUploader
 
 def chunked_upload_file(client):
 
-    def progress_callback(total, current, result_list):
-        print('{}/{}'.format(current, total))
+    def progress_callback(result, part_size, total_parts):
+        part_no = result['part']['offset'] // part_size
+        print('{}/{}'.format(part_no, total_parts))
 
     root_folder = client.folder(folder_id='0')
 
@@ -18,7 +19,7 @@ def chunked_upload_file(client):
         os.path.dirname(os.path.realpath(__file__)), 'soucle.m4v')
 
     chunked_uploader = ChunkedUploader(root_folder, file_path)
-    parts = chunked_uploader.upload_parts(progress_callback, multi=4)
+    parts = chunked_uploader.upload_parts(progress_callback, multi=8)
     chunked_uploader.commit(parts)
 
      

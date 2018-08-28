@@ -6,8 +6,9 @@ import json
 import mmap
 import base64
 import contextlib
+import concurrent.futures
+from operator import itemgetter
 from hashlib import sha1
-from concurrent.futures import ThreadPoolExecutor
 from boxsdk.config import API
 
 class ChunkedUploader:
@@ -82,22 +83,21 @@ class ChunkedUploader:
         put = self._folder._session.put
 
         total_parts = self._upload_session.total_parts
+        part_size = self._upload_session.part_size
         results = []
-        progress_callback(total_parts, 0, [])
 
-        for step in range((len(params_list)//multi)+1):
+        def progress(f):
+            result = f.result().json()
+            progress_callback(result, part_size, total_parts)
+            return result
+    
+        with concurrent.futures.ThreadPoolExecutor(max_workers=multi) as _:
+            futures = [ _.submit(put, url, **p) for p in params_list]
+            results = [
+                progress(f) for f in concurrent.futures.as_completed(futures)
+            ]
 
-            beg = step * multi
-            end = beg + multi
-            xparams = params_list[beg:end]
-
-            with ThreadPoolExecutor() as _: 
-                futures = [_.submit(put, url, **p) for p in xparams]
-                results.extend([future.result().json() for future in futures])
-
-            progress_callback(total_parts, len(results), results[beg:end])
-
-        return results
+        return sorted(results, key=lambda x: x['part']['offset'])
 
     def _upload_part(self, m, progress_callback, multi=4):
 
